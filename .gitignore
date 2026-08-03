@@ -1,0 +1,19 @@
+# 编译产物
+build/
+*.o
+*.elf
+*.map
+*.hex
+*.bin
+
+# IDE
+.idea/
+inspection-results/
+*.iml
+
+# CubeMX 辅助
+.mxproject
+
+# 系统
+Thumbs.db
+.DS_Store
