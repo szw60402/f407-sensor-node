@@ -18,7 +18,7 @@
 | **RTOS** | FreeRTOS (CMSIS_RTOS_V2) · 4 任务 + Mutex + 信号量 |
 | **传感器** | SHT3X (I²C 0x44) · GY-91/MPU-6500 (I²C 0x68) · ACS712 (ADC) · GL5516 (ADC) |
 | **显示** | SSD1306 OLED 128×64 (I²C 0x3C) |
-| **通信** | RS485 Modbus RTU 从站 (USART3) · CAN 2.0B 500kbps (CAN1) · USB CDC |
+| **通信** | RS485 Modbus RTU 从站 (USART6) · CAN 2.0B 500kbps (CAN1) · USB CDC |
 | **开发环境** | STM32CubeMX 6.15 → CMake + Ninja → CLion · arm-none-eabi-gcc 14.3.1 · ST-Link v2 |
 
 ---
@@ -42,7 +42,7 @@
 |------|------|------|
 | I²C1 (SHT3X/GY-91/OLED) | PB6=SCL, PB7=SDA | 三设备并联同总线 |
 | ADC1 | PA0=ACS712, PA1=GL5516 | DMA 半字双通道循环 |
-| USART3 (Modbus) | PC10=TX, PC11=RX, PC4=RE/DE | MAX485 |
+| USART6 (Modbus) | PC6=TX, PC7=RX, PC4=RE/DE | MAX485（⚠️ 本板 APB1 域 USART2/3+CAN1 外设损坏，485 迁至 APB2 域 USART6） |
 | CAN1 | PD0=RX, PD1=TX | TJA1050 |
 | USB OTG FS | PA9/PA11/PA12 | CDC 虚拟串口 |
 | LED | PD12=红(错误), PD13=绿(心跳) | 状态指示 |
@@ -97,3 +97,33 @@ STM32_Programmer_CLI -c port=SWD mode=UR \
 |------|------|
 | `docs/项目A调试流程手册.docx` | 外设分步测试操作手册（工具/接线/预期现象/排查） |
 | `docs/项目A踩坑记录.docx` | 17 个真实踩坑案例：现象 → 诊断 → 根因 → 解决 → 教训 |
+
+---
+
+## 实物照片与验证截图
+
+> 原始图片放入 `docs/images/`（文件名按下列引用一致）。未拍摄/未上传的留空位，拍好替换即可，无需改文字。
+
+### 1. 硬件全景（面包板接线 + OLED 正常显示）
+
+![硬件全景](docs/images/hardware_full.jpg)
+
+> 整机接线全貌 + OLED 正常运行显示（FreeRTOS 四任务调度工作状态）。
+
+### 2. RS485 发送链路验证 — PC6 波形（逻辑分析仪 D0 通道）
+
+![PC6 波形](docs/images/485_pc6_wave.png)
+
+> 逻辑分析仪抓 PC6（USART6_TX @ 115200-8N1），数据帧波形（起始位/数据位可见）。
+
+### 3. RS485 发送链路验证 — UART 解码结果
+
+![UART 解码](docs/images/485_uart_decode.png)
+
+> UART 协议解码：`01 03 00 00 00 07 04 08` = 从站地址 01 + 功能码 03（读保持寄存器）+ 起始寄存器 0x0000 + 数量 0x0007 + CRC-16 正确。即 **Modbus RTU 读请求帧**发送完整正确 —— MCU 侧链路全通。MAX485 模块侧（DI/DE 接线、模块本体）待验证。
+
+### 4. CAN 总线验证（预留空位）
+
+![CAN 验证](docs/images/can_verify.png)
+
+> 预留：CAN 报文解码截图（ID=0x100 传感器广播帧）。⚠️ 本板 CAN1 外设已确诊损坏（APB1 域，与 USART2/3 同一故障区），抓不到 CAN 波形属硬件问题；待拿到好板烧录本固件后补拍。
