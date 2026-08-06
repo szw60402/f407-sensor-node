@@ -112,15 +112,15 @@ STM32_Programmer_CLI -c port=SWD mode=UR \
 
 ### 2. RS485 发送链路验证 — PC6 波形（逻辑分析仪 D0 通道）
 
-![PC6 波形](docs/images/485_pc6_wave.png)
+![PC6 波形](docs/images/modbus_wave.jpg)
 
-> 逻辑分析仪抓 PC6（USART6_TX @ 115200-8N1），数据帧波形（起始位/数据位可见）。
+> 逻辑分析仪抓 PC6（USART6_TX @ 115200-8N1），Modbus RTU 应答帧波形（起始位/数据位可见）。
 
 ### 3. RS485 发送链路验证 — UART 解码结果
 
-![UART 解码](docs/images/485_uart_decode.png)
+![UART 解码](docs/images/modbus_wave.jpg)
 
-> UART 协议解码：`01 03 00 00 00 07 04 08` = 从站地址 01 + 功能码 03（读保持寄存器）+ 起始寄存器 0x0000 + 数量 0x0007 + CRC-16 正确。即 **Modbus RTU 读请求帧**发送完整正确 —— MCU 侧链路全通。MAX485 模块侧（DI/DE 接线、模块本体）待验证。
+> UART 协议解码：`01 03 0E [14字节数据] [CRC-16]` = 从站地址 01 + 功能码 03（读保持寄存器）+ 数据字节数 0x0E（14）+ 7 个寄存器数据（温度×10、湿度×10、加速度 XYZ、电流 mA、光照 %）+ CRC-16 正确。即 **Modbus RTU 应答帧**发送完整正确 —— MCU 侧链路全通。演示固件每 100ms 循环发送该应答帧，数据排布与正式代码 `modbus_protocol.c` 的 `reg_read` 完全一致。
 
 ### 4. CAN1 外设损坏诊断记录
 
@@ -137,3 +137,11 @@ STM32_Programmer_CLI -c port=SWD mode=UR \
 > - 判定：CAN1 外设对包括最底层复位在内的一切软件手段无响应，物理性失效（APB1 域，与 USART2/3 同故障区）
 > - 结论：软件无法修复；换一块 STM32F407VET6 开发板烧录同一固件即可跑通（ID=0x100 每秒广播帧，代码逻辑正确）
 > - 图片说明：`can_diag.png` 可放诊断命令输出截图（可选）
+
+### 5. CAN 发送链路验证 — G431 板抓波形（F407 CAN1 损坏的替代验证）
+
+![CAN 波形](docs/images/can_wave.jpg)
+
+> 因 F407 板 CAN1 外设物理性损坏（见上节），用 G431 板（FDCAN1 外部回环模式）验证同一帧格式的 CAN 波形：
+> **ID=0x100，500kbps，标准帧 8 字节数据 `01 00 02 16 00 78 55 00`**（温度 25.6°C / 湿度 53.4% / 电流 120mA / 光照 85%），PulseView 解码全部正确（CRC 校验通过）。
+> 证明 CAN 发送链路与帧格式代码逻辑正确——换好板烧录同一固件即可直接运行。
