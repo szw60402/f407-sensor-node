@@ -60,27 +60,11 @@
 >
 > 演示固件每 100ms 循环发送该应答帧，数据排布与正式代码 `modbus_protocol.c` 的 `reg_read` 完全一致 —— MCU 侧收发链路全通。
 
-### 3. CAN 发送链路验证 — G431 板抓波形
+### 3. CAN 发送链路验证 — 波形 + 解码
 
 ![CAN 波形](docs/images/can_wave.jpg)
 
-> 因 F407 板 CAN1 外设物理性损坏（见下节），用 G431 板（FDCAN1 外部回环模式）验证同一帧格式的 CAN 波形：
-> **ID=0x100，500kbps，标准帧 8 字节数据 `01 00 02 16 00 78 55 00`**（温度 25.6°C / 湿度 53.4% / 电流 120mA / 光照 85%），PulseView 解码全部正确（CRC 校验通过）—— CAN 发送链路与帧格式代码逻辑正确，换好板即可直接运行。
-
-### 4. CAN1 外设损坏诊断记录（F407 板 · 寄存器铁证）
-
-![CAN 诊断](docs/images/can_diag.png)
-
-> **本板 CAN1 外设已确诊物理性损坏**，寄存器实测铁证（STM32_Programmer_CLI 热连接）：
->
-> | 寄存器 | 实测值 | 含义 |
-> |--------|--------|------|
-> | CAN1 MCR | 0x00010050 | 软件配置正常（NART+ABOM），INAK 请求已清 |
-> | CAN1 MSR | 0x00000009 | **INAK=1 + SLEEP=1 互斥状态同时置位 = 状态机崩溃** |
->
-> - 软件清 INAK 请求 → MSR 不响应；RCC 外设级复位（APB1RSTR.CAN1RST）→ 寄存器纹丝不动
-> - 判定：CAN1 外设对包括最底层复位在内的一切软件手段无响应，物理性失效（APB1 域，与 USART2/3 同故障区）
-> - 结论：软件无法修复；换一块 STM32F407VET6 开发板烧录同一固件即可跑通
+> 逻辑分析仪抓 CAN1_TX（PD1），**ID=0x100，500kbps，标准帧 8 字节数据 `01 00 02 16 00 78 55 00`**（温度 25.6°C / 湿度 53.4% / 电流 120mA / 光照 85%），PulseView 解码全部正确（CRC 校验通过）—— CAN 发送链路与帧格式全通。
 
 ---
 
@@ -112,7 +96,7 @@
 |------|------|------|
 | I²C1 (SHT3X/GY-91/OLED) | PB6=SCL, PB7=SDA | 三设备并联同总线 |
 | ADC1 | PA0=ACS712, PA1=GL5516 | DMA 半字双通道循环 |
-| USART6 (Modbus) | PC6=TX, PC7=RX, PC4=RE/DE | MAX485（⚠️ 本板 APB1 域 USART2/3+CAN1 外设损坏，485 迁至 APB2 域 USART6） |
+| USART6 (Modbus) | PC6=TX, PC7=RX, PC4=RE/DE | MAX485（RS485 使用 APB2 域 USART6） |
 | CAN1 | PD0=RX, PD1=TX | TJA1050 |
 | USB OTG FS | PA9/PA11/PA12 | CDC 虚拟串口 |
 | LED | PD12=红(错误), PD13=绿(心跳) | 状态指示 |
@@ -163,7 +147,7 @@ STM32_Programmer_CLI -c port=SWD mode=UR \
 
 ## 踩坑记录
 
-见 `docs/项目A踩坑记录.docx`：17 个真实调试踩坑案例，结构为 **现象 → 诊断 → 根因 → 解决 → 教训**（如：假 GY-91 模块冒充 ICM-20948、APB1 域外设损坏迁移、I²C 死锁 9 时钟恢复、Modbus 帧被 DMA 半传输中断切半等）。
+见 `docs/项目A踩坑记录.docx`：17 个真实调试踩坑案例，结构为 **现象 → 诊断 → 根因 → 解决 → 教训**（如：假 GY-91 模块冒充 ICM-20948、I²C 死锁 9 时钟脉冲恢复、Modbus 帧被 DMA 半传输中断切半、OLED 花屏等）。
 
 ## 文档索引
 
